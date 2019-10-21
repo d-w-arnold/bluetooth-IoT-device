@@ -77,6 +77,28 @@ void Task2code(void *parameter) {
         Serial.print("Devices found: ");
         int deviceCount = foundDevices.getCount();
         Serial.println(deviceCount);
+
+        // If the map is empty, it must be the first scan, populate.
+        // If same device found again, update the millis.
+        for (uint32_t i = 0; i < deviceCount; i++) {
+            BLEAdvertisedDevice device = foundDevices.getDevice(i);
+            std::string key = device.getAddress().toString();
+            m[key] = millis();
+        }
+
+        if (!m.empty()) {
+            // Purge: remove any from the map with a millis more than 1000 millis old
+            std::unordered_map<std::string, unsigned long>::iterator it;
+            for (it = m.begin(); it != m.end();) {
+                if (it->second < (millis() - 1000)) {
+                    // Remove/Erase the item being iterated.
+                    it = m.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+
         Serial.println("Scan done!");
         scanner->clearResults();   // delete results fromBLEScan buffer to release memory
         delay(2000);
@@ -106,7 +128,6 @@ void setup() {
             &Task1,  /* Task handle. */
             0 /* Core where the task should run */
     );
-
 
     xTaskCreatePinnedToCore(
             Task2code, /* Function to implement the task */
