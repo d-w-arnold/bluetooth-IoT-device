@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <BLEDevice.h>
 #include <unordered_map>
+#include <list>
 
 BLEClient *pClient;
 BLEScan *scanner;
@@ -14,8 +15,10 @@ BLEScan *scanner;
 TaskHandle_t Task1;
 TaskHandle_t Task2;
 
-const int ledPin = 14;
-const int pirPin = 0;
+const int ledPin = 18;
+const int pirPin = 14;
+const int blinks = 1;
+const int scanInterval = 1349;
 
 volatile int motion = 0;
 
@@ -53,7 +56,7 @@ void bluetoothSetup() {
     // Set up scanner to search for BLE devices.
     scanner = BLEDevice::getScan();
     scanner->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks);
-    scanner->setInterval(1349);
+    scanner->setInterval(scanInterval);
     scanner->setWindow(449);
     scanner->setActiveScan(true);
 }
@@ -61,10 +64,34 @@ void bluetoothSetup() {
 void Task1code(void *parameter) {
     for (;;) {
         if (motion) {
+            detachInterrupt(pirPin); // Necessary ?
             motion = 0;
-            for (int i = 0; i < 2; ++i) {
+            attachInterrupt(pirPin, sense, CHANGE); // Necessary ?
+            for (int i = 0; i < blinks; ++i) {
                 blink();
             }
+            std::list<std::string> x;
+            for (auto & it : m) {
+                std::string tmp = it.first;
+                x.push_back(tmp);
+            }
+            delay(scanInterval * 2);
+            std::list<std::string> y;
+            for (auto & it : m) {
+                std::string tmp = it.first;
+                y.push_back(tmp);
+            }
+            std::list<std::string> diff;
+            for (const auto & ye : y) {
+                auto isInX = std::find(x.begin(), x.end(), ye) != x.end();
+                if (!isInX) {
+                    diff.push_back(ye);
+                }
+            }
+            // diff contains list of new devices.
+            // If these MAC addresses match any of the known MAC address of devices within a family,
+            //  send a welcome message,
+            //  and trigger the IoT system to turn on smart home lights accordingly.
         }
         delay(100);
     }
@@ -90,7 +117,7 @@ void Task2code(void *parameter) {
             // Purge: remove any from the map with a millis more than 1000 millis old
             std::unordered_map<std::string, unsigned long>::iterator it;
             for (it = m.begin(); it != m.end();) {
-                if (it->second < (millis() - 1000)) {
+                if (it->second < (millis() - scanInterval)) {
                     // Remove/Erase the item being iterated.
                     it = m.erase(it);
                 } else {
