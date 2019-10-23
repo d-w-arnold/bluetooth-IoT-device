@@ -19,6 +19,7 @@ const int ledPin = 18;
 const int pirPin = 14;
 const int blinks = 1;
 const int scanInterval = 1349;
+const std::string bleBeacon = "f5:5c:00:54:6b:78";
 
 volatile int motion = 0;
 
@@ -43,7 +44,11 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
         if (!(advertisedDevice.getName().empty())) {
             Serial.println(advertisedDevice.getName().c_str());
         }
-        Serial.println(advertisedDevice.getAddress().toString().c_str());
+        std::string macAddress = advertisedDevice.getAddress().toString();
+        Serial.println(macAddress.c_str());
+        if (macAddress == bleBeacon) {
+            Serial.print("** I've found the BLE Beacon :)\n");
+        }
     }
 };
 
