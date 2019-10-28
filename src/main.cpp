@@ -35,11 +35,17 @@ void sense() {
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) override {
         std::string macAddress = advertisedDevice.getAddress().toString();
-//        Serial.println(macAddress.c_str());
-        auto result = family.find(macAddress);
-        if (result != family.end()) {
-            Serial.print(("** I've found: " + result->second + "\n").c_str());
-            present[macAddress] = std::tuple<int, unsigned long, unsigned long>(pirIndex, millis(), millis());
+        auto resultFamily = family.find(macAddress);
+        auto resultPresent = present.find(macAddress);
+        if (resultFamily != family.end()) {
+            Serial.print(("** I've found: " + resultFamily->second + "\n").c_str());
+            if (resultPresent != present.end()) {
+                present[macAddress] = std::tuple<int, unsigned long, unsigned long>(std::get<0>(resultPresent->second),
+                                                                                    std::get<1>(resultPresent->second),
+                                                                                    millis());
+            } else {
+                present[macAddress] = std::tuple<int, unsigned long, unsigned long>(pirIndex, millis(), millis());
+            }
         }
     }
 };
@@ -62,8 +68,11 @@ void Task1code(void *parameter) {
             attachInterrupt(pirPin, sense, RISING); // Interrupt for when the PIR motion sensor, senses movement.
             Serial.print("** Blink! Motion detected\n");
             for (std::pair<std::string, std::tuple<int, unsigned long, unsigned long>> device : present) {
-                if (std::get<0>(device.second) == pirIndex) {
-                    Serial.print(("** Is home: " + family[device.first] + "\n").c_str()); // Device of a user just come home.
+                auto devicePirIndex = std::get<0>(device.second);
+                auto deviceFirstTime = std::get<1>(device.second);
+                if ((devicePirIndex == pirIndex) && ((millis() - deviceFirstTime) < (scanInterval * 10))) {
+                    // Device of a user just come home.
+                    Serial.print(("** Is home: " + family[device.first] + "\n").c_str());
                 }
             }
             pirIndex++;
@@ -76,6 +85,14 @@ void Task2code(void *parameter) {
     for (;;) {
         BLEScanResults foundDevices = scanner->start(5, false);
         Serial.println("Scan done!");
+        std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>>::iterator it;
+        for (it = present.begin(); it != present.end();) {
+            if (std::get<2>(it->second) < (millis() - (scanInterval * 10))) {
+                it = present.erase(it);
+            } else {
+                it++;
+            }
+        }
         scanner->clearResults(); // Delete results fromBLEScan buffer to release memory
         delay(2000);
     }
