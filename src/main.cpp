@@ -88,7 +88,8 @@ void Task2code(void *parameter) {
         Serial.println("Scan done!");
         std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>>::iterator it;
         for (it = present.begin(); it != present.end();) {
-            if (std::get<2>(it->second) < (millis() - (scanInterval * 10))) {
+            auto deviceMostRecentTime = std::get<2>(it->second);
+            if ((millis() - deviceMostRecentTime) > (scanInterval * 10)) {
                 Serial.print(("** Removed from present: " + family[it->first] + "\n").c_str());
                 it = present.erase(it);
             } else {
