@@ -18,8 +18,9 @@ TaskHandle_t Task2;
 const int pirPin = 17;
 const int scanInterval = 1349;
 std::unordered_map<std::string, std::string> family({
-                                                            {"f5:5c:00:54:6b:78", "BLE Beacon"},
-                                                            {"00:16:a4:c0:ff:ee", "Keith BLE Beacon"}
+                                                            {"f5:5c:00:54:6b:78", "BLE Beacon 1"},
+                                                            {"cc:f1:8c:c9:b0:f4", "BLE Beacon 2"}
+//                                                            {"00:16:a4:c0:ff:ee", "Keith BLE Beacon"}
                                                     });
 
 std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>> present;
@@ -73,7 +74,9 @@ void Task1code(void *parameter) {
                 auto deviceFirstTime = std::get<1>(device.second);
                 if ((devicePirIndex == pirIndex) && ((millis() - deviceFirstTime) < (scanInterval * 10))) {
                     // Device of a user just come home.
-                    Serial.print(("** Is home: " + family[device.first] + "\n").c_str());
+                    Serial.print(("** Device come home: " + family[device.first] + "\n").c_str());
+                } else {
+                    Serial.print(("** Device not come home: " + family[device.first] + "\n").c_str());
                 }
             }
             pirIndex++;
@@ -105,7 +108,7 @@ void setup() {
     pinMode(pirPin, INPUT); // Setup pin as a digital input pin, from the PIR motion sensor.
 
     Serial.begin(9600);
-    Serial.println("Starting Arduino BLE Client application...");
+    Serial.println("\n\nStarting IoT Device ...");
 
     bluetoothSetup();
 
