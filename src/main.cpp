@@ -2,7 +2,7 @@
  * IoT Device
  *
  * @author David W. Arnold
- * @version 18th Oct 2019
+ * @version 29th Oct 2019
  */
 #include <Arduino.h>
 #include <BLEDevice.h>
@@ -15,10 +15,11 @@ BLEScan *scanner;
 TaskHandle_t Task1;
 TaskHandle_t Task2;
 
-const int pirPin = 14;
+const int pirPin = 17;
 const int scanInterval = 1349;
 std::unordered_map<std::string, std::string> family({
-                                                            {"f5:5c:00:54:6b:78", "BLE Beacon"}
+                                                            {"f5:5c:00:54:6b:78", "BLE Beacon"},
+                                                            {"00:16:a4:c0:ff:ee", "Keith BLE Beacon"}
                                                     });
 
 std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>> present;
@@ -88,6 +89,7 @@ void Task2code(void *parameter) {
         std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>>::iterator it;
         for (it = present.begin(); it != present.end();) {
             if (std::get<2>(it->second) < (millis() - (scanInterval * 10))) {
+                Serial.print(("** Removed from present: " + family[it->first] + "\n").c_str());
                 it = present.erase(it);
             } else {
                 it++;
@@ -101,7 +103,7 @@ void Task2code(void *parameter) {
 void setup() {
     pinMode(pirPin, INPUT); // Setup pin as a digital input pin, from the PIR motion sensor.
 
-    Serial.begin(115200);
+    Serial.begin(9600);
     Serial.println("Starting Arduino BLE Client application...");
 
     bluetoothSetup();
