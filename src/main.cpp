@@ -1,4 +1,4 @@
-/***
+/**
  * IoT Device
  *
  * @author David W. Arnold
@@ -17,12 +17,7 @@ TaskHandle_t Task2;
 
 const int pirPin = 17;
 const int scanInterval = 1349;
-std::unordered_map<std::string, std::string> family({
-                                                            {"f5:5c:00:54:6b:78", "BLE Beacon 1"},
-                                                            {"cc:f1:8c:c9:b0:f4", "BLE Beacon 2"}
-//                                                            {"00:16:a4:c0:ff:ee", "Keith BLE Beacon"}
-                                                    });
-
+std::unordered_map<std::string, std::string> family;
 std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>> present;
 
 int pirIndex = 0;
@@ -40,7 +35,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
         auto resultFamily = family.find(macAddress);
         auto resultPresent = present.find(macAddress);
         if (resultFamily != family.end()) {
-            Serial.print(("** I've found: " + resultFamily->second + "\n").c_str());
+//            Serial.print(("** I've found: " + resultFamily->second + "\n").c_str());
             if (resultPresent != present.end()) {
                 present[macAddress] = std::tuple<int, unsigned long, unsigned long>(std::get<0>(resultPresent->second),
                                                                                     std::get<1>(resultPresent->second),
@@ -64,19 +59,28 @@ void bluetoothSetup() {
 
 void Task1code(void *parameter) {
     for (;;) {
+        // Populate information
+        while (Serial.available()) {
+            std::string bleDeviceMACAddress = Serial.readStringUntil('+').c_str();
+            std::string bleDeviceName = Serial.readStringUntil('*').c_str();
+            std::pair<std::string, std::string> device(bleDeviceMACAddress, bleDeviceName);
+            family.insert(device);
+        }
+        // If motion is detected
         if (motion) {
             detachInterrupt(pirPin); // Necessary ?
             motion = 0;
             attachInterrupt(pirPin, sense, RISING); // Interrupt for when the PIR motion sensor, senses movement.
-            Serial.print("** Blink! Motion detected\n");
+//            Serial.print("** Blink! Motion detected\n");
             for (std::pair<std::string, std::tuple<int, unsigned long, unsigned long>> device : present) {
                 auto devicePirIndex = std::get<0>(device.second);
                 auto deviceFirstTime = std::get<1>(device.second);
                 if ((devicePirIndex == pirIndex) && ((millis() - deviceFirstTime) < (scanInterval * 10))) {
                     // Device of a user just come home.
-                    Serial.print(("** Device come home: " + family[device.first] + "\n").c_str());
+//                    Serial.print(("** Device come home: " + family[device.first] + "\n").c_str());
+                    Serial.print((family[device.first] + "\n").c_str());
                 } else {
-                    Serial.print(("** Device not come home: " + family[device.first] + "\n").c_str());
+//                    Serial.print(("** Device not come home: " + family[device.first] + "\n").c_str());
                 }
             }
             pirIndex++;
@@ -88,12 +92,12 @@ void Task1code(void *parameter) {
 void Task2code(void *parameter) {
     for (;;) {
         BLEScanResults foundDevices = scanner->start(5, false);
-        Serial.println("Scan done!");
+//        Serial.println("Scan done!");
         std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>>::iterator it;
         for (it = present.begin(); it != present.end();) {
             auto deviceMostRecentTime = std::get<2>(it->second);
             if ((millis() - deviceMostRecentTime) > (scanInterval * 10)) {
-                Serial.print(("** Removed from present: " + family[it->first] + "\n").c_str());
+//                Serial.print(("** Removed from present: " + family[it->first] + "\n").c_str());
                 it = present.erase(it);
             } else {
                 it++;
@@ -108,7 +112,7 @@ void setup() {
     pinMode(pirPin, INPUT); // Setup pin as a digital input pin, from the PIR motion sensor.
 
     Serial.begin(9600);
-    Serial.println("\n\nStarting IoT Device ...");
+//    Serial.println("\n\nStarting IoT Device ...");
 
     bluetoothSetup();
 

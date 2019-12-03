@@ -1,0 +1,7 @@
+"/Users/David/Library/Application Support/JetBrains/Toolbox/apps/CLion/ch-0/192.6603.37/CLion.app/Contents/bin/cmake/mac/bin/cmake" -DCMAKE_BUILD_TYPE=ttgo-t-beam -G "CodeBlocks - Unix Makefiles" "/Users/David/Documents/University of Kent/Year 3/CO657/CO657-Assignments/CO657-Assignment-2-&-3/CO657-IoT_Device"
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/David/Documents/University of Kent/Year 3/CO657/CO657-Assignments/CO657-Assignment-2-&-3/CO657-IoT_Device/cmake-build-ttgo-t-beam
+
+Problems were encountered while collecting compiler information:
+	xtensa-esp32-elf-g++: error: unrecognized command line option '-mmacosx-version-min=10.14'

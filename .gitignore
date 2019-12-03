@@ -1,6 +1,3 @@
-/.pio
-/CMakeListsPrivate.txt
-/.travis.yml
-/CMakeLists.txt
-/platformio.ini
-/.idea
+.pio
+CMakeListsPrivate.txt
+.idea
