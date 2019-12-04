@@ -78,7 +78,7 @@ void Task1code(void *parameter) {
                 if ((devicePirIndex == pirIndex) && ((millis() - deviceFirstTime) < (scanInterval * 10))) {
                     // Device of a user just come home.
 //                    Serial.print(("** Device come home: " + family[device.first] + "\n").c_str());
-                    Serial.print((family[device.first] + "\n").c_str());
+                    Serial.print((device.first + "\n").c_str());
                 } else {
 //                    Serial.print(("** Device not come home: " + family[device.first] + "\n").c_str());
                 }
