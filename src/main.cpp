@@ -8,7 +8,6 @@
 #include <BLEDevice.h>
 #include <unordered_map>
 #include <tuple>
-#include <list>
 
 BLEClient *pClient;
 BLEScan *scanner;
@@ -18,12 +17,10 @@ TaskHandle_t Task2;
 
 const int pirPin = 17;
 const int scanInterval = 1349;
-const int resendCount = 5;
 std::unordered_map<std::string, std::string> family;
 std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>> present;
 
 int pirIndex = 0;
-bool goScanning = false;
 
 volatile int motion = 0;
 
@@ -38,6 +35,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
         auto resultFamily = family.find(macAddress);
         auto resultPresent = present.find(macAddress);
         if (resultFamily != family.end()) {
+//            Serial.print(("** I've found: " + resultFamily->second + "\n").c_str());
             if (resultPresent != present.end()) {
                 present[macAddress] = std::tuple<int, unsigned long, unsigned long>(std::get<0>(resultPresent->second),
                                                                                     std::get<1>(resultPresent->second),
@@ -59,103 +57,67 @@ void bluetoothSetup() {
     scanner->setActiveScan(true);
 }
 
-void Task1code(void *parameter) { // TODO Test this code works
-    // Requesting BLE Device Info from IoT Server
-    Serial.print("info\n");
-    bool infoReceived = false;
-    int infoCount = 0;
-    while (!infoReceived) {
+void Task1code(void *parameter) {
+    for (;;) {
+        // Populate information
         while (Serial.available()) {
-            // Receive BLE Device Info from IoT Server
             std::string bleDeviceMACAddress = Serial.readStringUntil('+').c_str();
             std::string bleDeviceName = Serial.readStringUntil('*').c_str();
             std::pair<std::string, std::string> device(bleDeviceMACAddress, bleDeviceName);
             family.insert(device);
-            Serial.print("ack\n");
-            infoReceived = true;
-            break;
-        }
-        if (!infoReceived) {
-            if (infoCount > resendCount) {
-                // Resend, Requesting BLE Device Info from IoT Server
-                Serial.print("info\n");
-            }
-        } else {
-            continue;
-        }
-        infoCount++;
-        delay(100);
-    }
-    goScanning = true;
-    // BLE Device Info received from IoT Server, continue with detecting motion
-    bool ackBLEMACAddressReceived = true;
-    int addressCount = 0;
-    std::list<std::string> lastBLEMACAddresses;
-    for (;;) {
-        // Receiving over Serial from IoT Server
-        while (Serial.available()) {
-            std::string ackString = Serial.readStringUntil('+').c_str();
-            if (ackString.find("ack") != std::string::npos) {
-                // Received ACK from IoT Server that BLE MAC Address has been received
-                ackBLEMACAddressReceived = true;
-            }
-        }
-        // Resend last BLE MAC Address, as ACK has not been received from IoT Server
-        if (!ackBLEMACAddressReceived && addressCount > resendCount) {
-            if (!lastBLEMACAddresses.empty()) {
-                auto it = lastBLEMACAddresses.begin();
-                std::advance(it, 0);
-                Serial.print((*it + "\n").c_str());
-                lastBLEMACAddresses.erase(it);
-            }
         }
         // If motion is detected
         if (motion) {
             detachInterrupt(pirPin); // Necessary ?
             motion = 0;
             attachInterrupt(pirPin, sense, RISING); // Interrupt for when the PIR motion sensor, senses movement.
+//            Serial.print("** Blink! Motion detected\n");
             for (std::pair<std::string, std::tuple<int, unsigned long, unsigned long>> device : present) {
                 auto devicePirIndex = std::get<0>(device.second);
                 auto deviceFirstTime = std::get<1>(device.second);
                 if ((devicePirIndex == pirIndex) && ((millis() - deviceFirstTime) < (scanInterval * 10))) {
                     // Device of a user just come home.
+//                    Serial.print(("** Device come home: " + family[device.first] + "\n").c_str());
                     Serial.print((device.first + "\n").c_str());
-                    lastBLEMACAddresses.push_back(device.first);
-                    ackBLEMACAddressReceived = false;
-                    addressCount = 0;
+                } else {
+//                    Serial.print(("** Device not come home: " + family[device.first] + "\n").c_str());
                 }
             }
             pirIndex++;
         }
-        addressCount++;
         delay(100);
     }
 }
 
 void Task2code(void *parameter) {
     for (;;) {
-        if (goScanning) {
-            BLEScanResults foundDevices = scanner->start(5, false);
-            std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>>::iterator it;
-            for (it = present.begin(); it != present.end();) {
-                auto deviceMostRecentTime = std::get<2>(it->second);
-                if ((millis() - deviceMostRecentTime) > (scanInterval * 10)) {
-                    it = present.erase(it);
-                } else {
-                    it++;
-                }
+        BLEScanResults foundDevices = scanner->start(5, false);
+//        Serial.println("Scan done!");
+        std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>>::iterator it;
+        for (it = present.begin(); it != present.end();) {
+            auto deviceMostRecentTime = std::get<2>(it->second);
+            if ((millis() - deviceMostRecentTime) > (scanInterval * 10)) {
+//                Serial.print(("** Removed from present: " + family[it->first] + "\n").c_str());
+                it = present.erase(it);
+            } else {
+                it++;
             }
-            scanner->clearResults(); // Delete results fromBLEScan buffer to release memory
-            delay(2000);
         }
+        scanner->clearResults(); // Delete results fromBLEScan buffer to release memory
+        delay(2000);
     }
 }
 
 void setup() {
     pinMode(pirPin, INPUT); // Setup pin as a digital input pin, from the PIR motion sensor.
+
     Serial.begin(9600);
+//    Serial.println("\n\nStarting IoT Device ...");
+
     bluetoothSetup();
+
     attachInterrupt(pirPin, sense, RISING); // Interrupt for when the PIR motion sensor, senses movement.
+
     xTaskCreatePinnedToCore(
             Task1code, /* Function to implement the task */
             "Task1", /* Name of the task */
@@ -165,6 +127,7 @@ void setup() {
             &Task1,  /* Task handle. */
             0 /* Core where the task should run */
     );
+
     xTaskCreatePinnedToCore(
             Task2code, /* Function to implement the task */
             "Task2", /* Name of the task */
