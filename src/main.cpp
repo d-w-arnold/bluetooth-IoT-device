@@ -15,6 +15,9 @@ BLEScan *scanner;
 TaskHandle_t Task1;
 TaskHandle_t Task2;
 
+const int baud = 9600; // Zigbee
+//const int baud = 115200; // Direct, no Zigbee
+
 const int pirPin = 17;
 const int scanInterval = 1349;
 std::unordered_map<std::string, std::string> family;
@@ -22,6 +25,7 @@ std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>> p
 
 int pirIndex = 0;
 
+volatile bool infoReceived = false;
 volatile int motion = 0;
 
 void sense() {
@@ -58,6 +62,9 @@ void bluetoothSetup() {
 }
 
 void Task1code(void *parameter) {
+    // Requesting BLE Device Info from IoT Server
+//    std::string info = "info";
+//    Serial.print(("\n" + info + "\n").c_str());
     for (;;) {
         // Populate information
         while (Serial.available()) {
@@ -65,10 +72,11 @@ void Task1code(void *parameter) {
             std::string bleDeviceName = Serial.readStringUntil('*').c_str();
             std::pair<std::string, std::string> device(bleDeviceMACAddress, bleDeviceName);
             family.insert(device);
+            infoReceived = true;
         }
         // If motion is detected
-        if (motion) {
-            detachInterrupt(pirPin); // Necessary ?
+        if (motion && infoReceived) {
+            detachInterrupt(pirPin);
             motion = 0;
             attachInterrupt(pirPin, sense, RISING); // Interrupt for when the PIR motion sensor, senses movement.
 //            Serial.print("** Blink! Motion detected\n");
@@ -91,27 +99,29 @@ void Task1code(void *parameter) {
 
 void Task2code(void *parameter) {
     for (;;) {
-        BLEScanResults foundDevices = scanner->start(5, false);
+        if (infoReceived) {
+            BLEScanResults foundDevices = scanner->start(5, false);
 //        Serial.println("Scan done!");
-        std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>>::iterator it;
-        for (it = present.begin(); it != present.end();) {
-            auto deviceMostRecentTime = std::get<2>(it->second);
-            if ((millis() - deviceMostRecentTime) > (scanInterval * 10)) {
+            std::unordered_map<std::string, std::tuple<int, unsigned long, unsigned long>>::iterator it;
+            for (it = present.begin(); it != present.end();) {
+                auto deviceMostRecentTime = std::get<2>(it->second);
+                if ((millis() - deviceMostRecentTime) > (scanInterval * 10)) {
 //                Serial.print(("** Removed from present: " + family[it->first] + "\n").c_str());
-                it = present.erase(it);
-            } else {
-                it++;
+                    it = present.erase(it);
+                } else {
+                    it++;
+                }
             }
+            scanner->clearResults(); // Delete results fromBLEScan buffer to release memory
+            delay(2000);
         }
-        scanner->clearResults(); // Delete results fromBLEScan buffer to release memory
-        delay(2000);
     }
 }
 
 void setup() {
     pinMode(pirPin, INPUT); // Setup pin as a digital input pin, from the PIR motion sensor.
 
-    Serial.begin(9600);
+    Serial.begin(baud);
 //    Serial.println("\n\nStarting IoT Device ...");
 
     bluetoothSetup();
