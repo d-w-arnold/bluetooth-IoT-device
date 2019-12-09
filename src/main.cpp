@@ -15,8 +15,8 @@ BLEScan *scanner;
 TaskHandle_t Task1;
 TaskHandle_t Task2;
 
-const int baud = 9600; // Zigbee
-//const int baud = 115200; // Direct, no Zigbee
+//const int baud = 9600; // Zigbee
+const int baud = 115200; // Direct, no Zigbee
 
 const int pirPin = 17;
 const int scanInterval = 1349;
